@@ -27,7 +27,27 @@ from train import with_newton_default
 from isaaclab_rl import run_play_cli
 
 
-def run_recording(argv: list[str], *, publication=False, stop_on_termination=False, output_dir=None):
+def configure_standard(env_cfg):
+    """Use authored placement, a closed mechanism and home arm with fixed dynamics."""
+    env_cfg.events.reset_from_bank.params.update(standard=True, mid_start_prob=0.0)
+    env_cfg.events.robot_physics_material = None
+    env_cfg.events.valve_physics_material = None
+    env_cfg.events.arm_delay.params["delay_range_s"] = (0.0, 0.0)
+    env_cfg.events.valve_dynamics.params.update(
+        ranges={"friction": (0.05, 0.05), "damping": (0.0, 0.0), "spring": (0.0, 0.0),
+                "breakaway": (0.0, 0.0), "armature": (0.005, 0.005)},
+        stuck_prob=0.0,
+    )
+    for group in vars(env_cfg.observations).values():
+        if hasattr(group, "enable_corruption"):
+            group.enable_corruption = False
+        registered = getattr(group, "registered_valve", None)
+        if registered is not None:
+            registered.params.update(bias_pos=0.0, bias_rot=0.0, jitter_pos=0.0, angle_noise=0.0)
+    env_cfg.commands.valve_turn.rate_range = (0.3, 0.3)
+
+
+def run_recording(argv: list[str], *, publication=False, stop_on_termination=False, output_dir=None, standard=False):
     """Configure isolated upstream hooks for video output and first-episode playback."""
     from isaaclab.envs.utils import video_recorder
     from isaaclab.envs.utils.video_recorder_cfg import VideoRecorderCfg
@@ -43,6 +63,8 @@ def run_recording(argv: list[str], *, publication=False, stop_on_termination=Fal
         raise ImportError("moviepy is required for video recording")
 
     def configure(env_cfg, args_cli):
+        if standard:
+            configure_standard(env_cfg)
         if output_dir is not None or stop_on_termination:
             args_cli.num_envs = 1
         if not publication:
@@ -108,16 +130,19 @@ def run_recording(argv: list[str], *, publication=False, stop_on_termination=Fal
 
 def main(argv=None):
     parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--standard", action="store_true")
     parser.add_argument("--publication", action="store_true")
     parser.add_argument("--stop-on-termination", action="store_true")
     parser.add_argument("--video-output", default=None)
     options, argv = parser.parse_known_args(sys.argv[1:] if argv is None else argv)
-    if options.publication or options.stop_on_termination or options.video_output:
-        argv = [*argv, "--video"]
+    if options.standard or options.publication or options.stop_on_termination or options.video_output:
+        if options.publication or options.stop_on_termination or options.video_output:
+            argv = [*argv, "--video"]
         if options.publication:
             argv.extend(["--viz", "newton_rtx"])
         return run_recording(
             with_newton_default(argv),
+            standard=options.standard,
             publication=options.publication,
             stop_on_termination=options.stop_on_termination,
             output_dir=options.video_output,

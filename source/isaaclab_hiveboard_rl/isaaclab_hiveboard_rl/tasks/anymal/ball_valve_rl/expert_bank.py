@@ -241,8 +241,22 @@ class reset_from_expert_bank(ManagerTermBase):
         path: str,
         mid_start_prob: float = 0.0,
         expert_task: str | None = None,
+        standard: bool = False,
     ) -> None:
         ids = torch.arange(env.num_envs, device=env.device) if env_ids is None or isinstance(env_ids, slice) else env_ids
+        if standard:
+            # Keep reference bookkeeping, but retain the preceding authored scene reset.
+            # Recording is evaluated from home, rather than a sampled expert start.
+            self.index[ids] = 0
+            self.start_step[ids] = 0
+            from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl.env import ARM_POSTURES
+            from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl import mdp
+
+            robot = env.scene["robot"]
+            home = torch.tensor(ARM_POSTURES["home"], device=env.device).expand(len(ids), -1)
+            robot.write_joint_position_to_sim_index(position=home, joint_ids=self._arm_ids, env_ids=ids)
+            mdp.write_valve_angle(env, ids, torch.full((len(ids),), env.cfg.valve_task.closed_rad, device=env.device))
+            return
         draw = torch.randint(0, self.bank.size, (len(ids),), device=env.device)
         self.write_start_state(env, ids, draw)
         if mid_start_prob > 0.0:

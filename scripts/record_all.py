@@ -38,7 +38,7 @@ def load_examples(path):
         raise ValueError("defaults must be a mapping.")
     examples, names = [], set()
     allowed = {"name", "task", "checkpoint", "agent", "publication", "video_length", "seed", "device",
-               "timeout", "crash_retries", "args"}
+               "timeout", "crash_retries", "standard", "args"}
     for entry in data["examples"]:
         if not isinstance(entry, dict):
             raise ValueError("Each example must be a mapping.")
@@ -64,6 +64,8 @@ def load_examples(path):
             example[key] = value
         if type(example.get("publication", True)) is not bool:
             raise ValueError(f"{name}: publication must be true or false.")
+        if type(example.get("standard", True)) is not bool:
+            raise ValueError(f"{name}: standard must be true or false.")
         extra = example.get("args", [])
         if not isinstance(extra, list) or not all(isinstance(arg, str) for arg in extra):
             raise ValueError(f"{name}: args must be a list of strings.")
@@ -82,6 +84,8 @@ def player_command(example, output):
                "--num_envs", "1", "--video_length", str(example["video_length"]),
                "--video_interval", "0", "--stop-on-termination", "--video-output", str(output),
                "--seed", str(example.get("seed", 0)), "--device", example.get("device", "cuda:0")]
+    if example.get("standard", True):
+        command.append("--standard")
     command.extend(["--publication"] if example.get("publication", True) else ["--viz", "newton"])
     return [*command, *example.get("args", [])]
 
@@ -123,6 +127,7 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=ROOT / "videos/examples")
     parser.add_argument("--task", action="append", help="Exact task ID; repeat to select several.")
     parser.add_argument("--match", default="", help="Substring filter on example names or task IDs.")
+    parser.add_argument("--randomized", action="store_true", help="Use randomized task starts and dynamics.")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -134,6 +139,8 @@ def main(argv=None):
                 and args.match.lower() in (e["name"] + " " + e["task"]).lower()]
     if not examples:
         parser.error("No configured examples match the selection.")
+    if args.randomized:
+        examples = [{**e, "standard": False} for e in examples]
     output = args.output.resolve() / datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
     if args.list or args.dry_run:
         for example in examples:

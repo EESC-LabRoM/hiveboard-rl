@@ -2,6 +2,7 @@
 defaults:
   agent: rsl_rl_student_ppo_cfg_entry_point
   publication: true
+  standard: true  # Authored placement, closed mechanism, home arm, fixed physics; no observation noise.
   video_length: 400  # Maximum policy steps; stop earlier on termination or timeout.
   seed: 0
   device: cuda:0

@@ -55,6 +55,7 @@ For a batch of examples, edit `configs/recordings.yaml` to select tasks, checkpo
 
 ```bash
 just record-all                        # record each configured checkpoint's first episode
+just record-all --randomized           # restore randomized starts, dynamics, and registration error
 just record-all --list                 # list configured examples
 just record-all --dry-run              # inspect commands without launching simulations
 just record-all --match ball-valve     # record a subset
@@ -66,6 +67,10 @@ checks the resulting MP4s, and saves per-attempt logs plus `summary.json` in a d
 `videos/examples/`. `--output` changes the parent folder. Checkpoint paths in YAML are relative to the repository
 root; each example can override `defaults` and pass additional playback options in an `args` list.
 `video_length` caps policy steps if an episode has not terminated, while `timeout` caps wall time per attempt.
+Recordings use standard conditions by default: authored placement, a closed mechanism, the home arm posture,
+fixed nominal dynamics, zero actuator delay, and no observation or registration noise. Set `standard: false`
+for an individual YAML example, or pass `--randomized` for the whole batch. Single playback also accepts `--standard`.
+The expert bank remains loaded for reward references; those references may differ from the nominal recording start.
 The supplied configuration includes BallValve, M30Thread, and CircuitBreaker PPO students. Add other tasks
 when their checkpoints are available.
 

@@ -730,7 +730,8 @@ class ValveTurnRateCommand(CommandTerm):
         # and expert-bank trajectory read here are the new episode's.
         self.rate[env_ids] = torch.empty_like(self.rate[env_ids]).uniform_(*self.cfg.rate_range)
         bank_term = getattr(self._env, "expert_bank_term", None)
-        if bank_term is not None and bank_term.bank.turn_rate is not None:
+        if (bank_term is not None and bank_term.bank.turn_rate is not None
+                and not bank_term.cfg.params.get("standard", False)):
             # The expert's own turning speed: the references follow it.
             self.rate[env_ids] = bank_term.bank.turn_rate[bank_term.index[env_ids]]
         self.ref_angle[env_ids] = valve_angle(self._env)[env_ids]

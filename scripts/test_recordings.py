@@ -96,6 +96,21 @@ class RecordingTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             self.assertIn(result["returncode"], record_all.core.CRASH_RETURNCODES)
 
+    def test_standard_configuration(self):
+        from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl.env import AnymalBallValveRLEnvCfg_PLAY
+        from isaaclab_hiveboard_rl.tasks.anymal.m30_thread_rl.env import AnymalM30ThreadRLEnvCfg_PLAY
+        from isaaclab_hiveboard_rl.tasks.anymal.circuit_breaker_rl.env import AnymalCircuitBreakerRLEnvCfg_PLAY
+        for cls in (AnymalBallValveRLEnvCfg_PLAY, AnymalM30ThreadRLEnvCfg_PLAY,
+                    AnymalCircuitBreakerRLEnvCfg_PLAY):
+            with self.subTest(task=cls.__name__):
+                cfg = cls()
+                play.configure_standard(cfg)
+                self.assertTrue(cfg.events.reset_from_bank.params["standard"])
+                self.assertEqual(cfg.events.arm_delay.params["delay_range_s"], (0.0, 0.0))
+                self.assertEqual(cfg.events.valve_dynamics.params["stuck_prob"], 0.0)
+                self.assertTrue(all(lo == hi for lo, hi in cfg.events.valve_dynamics.params["ranges"].values()))
+                self.assertTrue(all(value == 0 for value in cfg.observations.policy.registered_valve.params.values()))
+
     def test_config_validation_and_batch_continues_after_failure(self):
         with tempfile.TemporaryDirectory() as folder:
             folder = Path(folder)
@@ -109,6 +124,8 @@ class RecordingTests(unittest.TestCase):
             config.write_text(yaml.safe_dump({"examples": [entry, {**entry, "name": "two"}]}))
             examples = record_all.load_examples(config)
             command = record_all.player_command(examples[0], folder / "clips")
+            self.assertIn("--standard", command)
+            self.assertNotIn("--standard", record_all.player_command({**examples[0], "standard": False}, folder))
             self.assertIn("--stop-on-termination", command)
             self.assertEqual(command[command.index("--num_envs") + 1], "1")
             results = [{"status": "failed", "error": "test failure"}, {"status": "ok", "video": "test.mp4"}]
