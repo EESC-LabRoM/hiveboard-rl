@@ -908,6 +908,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "isaaclab-hiveboard" },
+    { name = "pyyaml" },
     { name = "tensorboard" },
     { name = "wandb" },
 ]
@@ -924,6 +925,7 @@ imitation = [
 requires-dist = [
     { name = "egl-probe", marker = "extra == 'imitation'", specifier = ">=1.0.1" },
     { name = "isaaclab-hiveboard", editable = "dependencies/isaaclab-hiveboard" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "robomimic", marker = "extra == 'imitation'", git = "https://github.com/ARISE-Initiative/robomimic.git?tag=v0.4.0" },
     { name = "tensorboard", specifier = ">=2.20.0" },
     { name = "tensorboardx", marker = "extra == 'imitation'" },

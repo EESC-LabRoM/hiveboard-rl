@@ -38,11 +38,36 @@ just rl-bank                          # build the cuRobo expert bank -> logs/exp
 just rl-student-ppo                   # working solution: bank-guided PPO, no teacher checkpoint
 just rl-eval <model_*.pt>             # success rate / stage metrics
 just rl-play <model_*.pt>             # Newton viewer + TorchScript/ONNX export
+just rl-video-publication <model_*.pt> # 1080p RTX publication video -> <run>/videos/play/
 
 # Select the same task for bank generation, training and evaluation:
 RL_TOOL=SmallValve just rl-bank       # BallValve (default), SmallValve, M30Thread, CircuitBreaker
 RL_TOOL=SmallValve just rl-student-ppo
 ```
+
+Publication recording uses the core recorder's publication settings: RTX quality 100, studio lighting,
+50 FPS output, and H.264 CRF 12 with the slow preset. Frames are captured at the RL policy's step rate
+and repeated for 50 FPS output, preserving simulation timing. Pass `--video_length` to change the
+default 240 policy steps (12 seconds), or `--agent rsl_rl_distillation_cfg_entry_point` for a distilled student.
+Recording stops at the first termination or episode timeout, omitting the autoreset frame.
+
+For a batch of examples, edit `configs/recordings.yaml` to select tasks, checkpoints, and recording settings:
+
+```bash
+just record-all                        # record each configured checkpoint's first episode
+just record-all --list                 # list configured examples
+just record-all --dry-run              # inspect commands without launching simulations
+just record-all --match ball-valve     # record a subset
+just record-all --config path/to.yaml  # use another configuration
+```
+
+Like the core repository's `record-all`, this runs examples in separate processes, retries simulation crashes,
+checks the resulting MP4s, and saves per-attempt logs plus `summary.json` in a dated folder under
+`videos/examples/`. `--output` changes the parent folder. Checkpoint paths in YAML are relative to the repository
+root; each example can override `defaults` and pass additional playback options in an `args` list.
+`video_length` caps policy steps if an episode has not terminated, while `timeout` caps wall time per attempt.
+The supplied configuration includes BallValve, M30Thread, and CircuitBreaker PPO students. Add other tasks
+when their checkpoints are available.
 
 The following alternative workflows remain in the repository. Teacher checkpoints are required only for
 student distillation; these commands are not steps in the working PPO-student workflow above.

@@ -14,6 +14,7 @@ dependencies = [
     "isaaclab-hiveboard",
     "wandb>=0.26.1",
     "tensorboard>=2.20.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

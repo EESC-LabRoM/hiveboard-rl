@@ -79,3 +79,12 @@ rl-play checkpoint *args:
 rl-video checkpoint *args:
     uv run python scripts/rl/play.py --task Isaac-HiveBoard-Anymal-{{rl_tool}}-RL-Play-v0 --checkpoint {{checkpoint}} \
         --num_envs 1 --video --video_length 240 --viz newton {{args}}
+
+# Record a checkpoint at 1080p with converged RTX, studio lighting and CRF 12 / slow encoding
+rl-video-publication checkpoint *args:
+    uv run python scripts/rl/play.py --task Isaac-HiveBoard-Anymal-{{rl_tool}}-RL-Play-v0 --checkpoint {{checkpoint}} \
+        --num_envs 1 --video_length 240 --publication --stop-on-termination {{args}}
+
+# Record the first episode of every task/checkpoint in configs/recordings.yaml
+record-all *args:
+    uv run python scripts/record_all.py {{args}}

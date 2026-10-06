@@ -1,0 +1,20 @@
+# Paths are relative to the repository root. Each example records its first episode.
+defaults:
+  agent: rsl_rl_student_ppo_cfg_entry_point
+  publication: true
+  video_length: 400  # Maximum policy steps; stop earlier on termination or timeout.
+  seed: 0
+  device: cuda:0
+  timeout: 900      # Maximum wall seconds per attempt.
+  crash_retries: 2
+
+examples:
+  - name: ball-valve
+    task: Isaac-HiveBoard-Anymal-BallValve-RL-Play-v0
+    checkpoint: logs/rsl_rl/anymal_ball_valve_student_ppo/2026-10-01_15-57-28_student_ppo_v10_noflip/model_600.pt
+  - name: m30-thread
+    task: Isaac-HiveBoard-Anymal-M30Thread-RL-Play-v0
+    checkpoint: logs/rsl_rl/anymal_m30_thread_student_ppo/2026-10-02_08-33-09_student_ppo_v1/model_600.pt
+  - name: circuit-breaker
+    task: Isaac-HiveBoard-Anymal-CircuitBreaker-RL-Play-v0
+    checkpoint: logs/rsl_rl/anymal_circuit_breaker_student_ppo/2026-10-03_04-14-30_student_ppo_v2_raised/model_600.pt
