@@ -1,0 +1,208 @@
+# Copyright (c) 2024-2026 EESC-LabRoM & The Isaac Lab Project Developers.
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[project]
+name = "hiveboard-rl"
+version = "0.1.0"
+description = "RL and imitation learning on the HiveBoard Isaac Lab environments"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Core environments; brings Isaac Lab (incl. rsl-rl-lib), cuRobo, h5py, ...
+    "isaaclab-hiveboard",
+    "wandb>=0.26.1",
+    "tensorboard>=2.20.0",
+]
+
+[project.optional-dependencies]
+# Behaviour cloning / DAgger. Isaac Lab installs robomimic from git (no PyPI
+# release carries v0.4.0); scripts/imitation/train_bc.py expects this revision.
+imitation = [
+    "robomimic",
+    "egl-probe>=1.0.1",
+    "tensorboardX",
+    "termcolor",
+]
+
+# ---------------------------------------------------------------------------
+# Everything below mirrors dependencies/isaaclab-hiveboard/pyproject.toml:
+# uv applies indexes, sources and overrides only from the top-level project.
+# Keep it in sync when bumping the submodule.
+# ---------------------------------------------------------------------------
+
+[[tool.uv.index]]
+url = "https://pypi.nvidia.com/"
+
+# Named indexes referenced by Isaac Lab's own [tool.uv.sources].
+[[tool.uv.index]]
+name = "pypi-public"
+url = "https://pypi.org/simple"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+isaaclab-hiveboard = { path = "dependencies/isaaclab-hiveboard", editable = true }
+robomimic = { git = "https://github.com/ARISE-Initiative/robomimic.git", tag = "v0.4.0" }
+nvidia-curobo = { path = "dependencies/isaaclab-hiveboard/dependencies/curobo", editable = true }
+isaaclab-dev = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab" }
+isaaclab = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab", editable = true }
+isaaclab-assets = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_assets", editable = true }
+isaaclab-contrib = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_contrib", editable = true }
+isaaclab-experimental = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_experimental", editable = true }
+isaaclab-newton = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_newton", editable = true }
+isaaclab-ov = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_ov", editable = true }
+isaaclab-physx = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_physx", editable = true }
+isaaclab-ppisp = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_ppisp", editable = true }
+isaaclab-rl = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_rl", editable = true }
+isaaclab-tasks = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_tasks", editable = true }
+isaaclab-tasks-experimental = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_tasks_experimental", editable = true }
+isaaclab-visualizers = { path = "dependencies/isaaclab-hiveboard/dependencies/IsaacLab/source/isaaclab_visualizers", editable = true }
+omniverseclient = { index = "pypi-public" }
+ovphysx = { index = "pypi-public" }
+ovrtx = { index = "pypi-public" }
+ovstage = { index = "pypi-public" }
+torch = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[tool.uv]
+# Overrides only apply at the top-level project, so mirror Isaac Lab's own
+# (dependencies/IsaacLab/pyproject.toml): it owns the Newton, MuJoCo and torch
+# versions, and the isaacsim wheels pin older ones.
+override-dependencies = [
+    "numpy>=2",
+    "mujoco~=3.12.0",
+    "mujoco-warp~=3.12.0",
+    "newton[sim]==1.6.1",
+    "newton-usd-schemas>=0.5.0",
+    # isaacsim-asset-isolated and isaacsim-robot-schema 6.1 pin usd-exchange ==2.3.0.
+    "usd-exchange==3.0.0",
+    # usd-optimize must share usd-exchange's OpenUSD build (26.08); bump the two together.
+    "usd-optimize~=1.3.0",
+    "torch==2.12.0",
+    "torchvision==0.27.0",
+    "packaging>=20,<27",
+]
+index-strategy = "unsafe-best-match"
+prerelease = "allow"
+# egl-probe 1.0.2 declares cmake_minimum_required < 3.5, which CMake 4 rejects.
+extra-build-variables = { egl-probe = { CMAKE_POLICY_VERSION_MINIMUM = "3.5" } }
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["source/isaaclab_hiveboard_rl"]
+include = ["isaaclab_hiveboard_rl*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+# Exclude directories
+extend-exclude = [
+    "logs",
+    "_isaac_sim",
+    ".vscode",
+    "_*",
+    ".git",
+    "dependencies",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "C90",    # mccabe complexity
+    "SIM",    # flake8-simplify
+    "RET",    # flake8-return
+]
+
+ignore = [
+    "E402",   # Module level import not at top of file
+    "D401",   # First line should be in imperative mood
+    "RET504", # Unnecessary variable assignment before return statement
+    "RET505", # Unnecessary elif after return statement
+    "SIM102", # Use a single if-statement instead of nested if-statements
+    "SIM103", # Return the negated condition directly
+    "SIM108", # Use ternary operator instead of if-else statement
+    "SIM117", # Merge with statements for context managers
+    "SIM118", # Use {key} in {dict} instead of {key} in {dict}.keys()
+    "UP006",  # Use 'dict' instead of 'Dict' type annotation
+    "UP018",  # Unnecessary `float` call (rewrite as a literal)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 30
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "omniverse-extensions",
+    "isaaclab",
+    "isaaclab-contrib",
+    "isaaclab-rl",
+    "isaaclab-mimic",
+    "isaaclab-hiveboard",
+    "isaaclab-tasks",
+    "isaaclab-assets",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+"omniverse-extensions" = [
+    "isaacsim",
+    "omni",
+    "pxr",
+    "carb",
+    "usdrt",
+    "Semantics",
+    "curobo",
+]
+"isaaclab" = ["isaaclab"]
+"isaaclab-assets" = ["isaaclab_assets"]
+"isaaclab-contrib" = ["isaaclab_contrib"]
+"isaaclab-rl" = ["isaaclab_rl"]
+"isaaclab-mimic" = ["isaaclab_mimic"]
+"isaaclab-tasks" = ["isaaclab_tasks"]
+"isaaclab-hiveboard" = ["isaaclab_hiveboard"]
+
+[tool.pyright]
+include = ["source", "scripts"]
+exclude = [
+    "dependencies",
+    "**/__pycache__",
+    "**/_isaac_sim",
+    "**/docs",
+    "**/logs",
+    ".git",
+    ".vscode",
+]
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
+pythonPlatform = "Linux"
+enableTypeIgnoreComments = true
+reportMissingImports = "none"
+reportMissingModuleSource = "none"
+reportGeneralTypeIssues = "none"
+reportOptionalMemberAccess = "warning"
+reportPrivateUsage = "warning"
