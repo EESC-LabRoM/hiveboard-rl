@@ -1,8 +1,10 @@
 # HiveBoard RL
 
 Reinforcement and imitation learning on the [isaaclab-hiveboard](https://github.com/EESC-LabRoM/isaaclab-hiveboard)
-environments: PPO teachers, distilled / PPO students and the cuRobo expert banks they track (ANYmal ball valve,
-small valve, M30 thread, circuit breaker), plus robomimic behaviour cloning and DAgger.
+environments (ANYmal ball valve, small valve, M30 thread, circuit breaker).
+**The current working solution is the PPO student trained with a cuRobo expert trajectory bank.**
+Teacher training, student distillation, robomimic behaviour cloning and DAgger remain available as alternative
+workflows, but are not the current working solution.
 
 The core environments are a git submodule (`dependencies/isaaclab-hiveboard`), installed editable. This repo only
 adds the `isaaclab_hiveboard_rl` package, which registers the `*-RL-v0` / `*-RL-Play-v0` tasks on top of the core
@@ -26,16 +28,28 @@ top-level project). Keep the two in sync when bumping the submodule.
 
 ## Usage
 
+The working workflow is **trajectory bank → PPO student → evaluation / playback**. No PPO teacher or teacher
+checkpoint is used. The student learns through PPO rewards: the bank supplies episode resets, expert-tracking
+rewards and deviation terminations, rather than supervised action targets. The actor uses deployable
+observations; the critic uses privileged simulator state, including expert-reference errors.
+
 ```bash
 just rl-bank                          # build the cuRobo expert bank -> logs/expert_bank/
-just rl-teacher                       # PPO teacher on privileged state
-just rl-student <teacher model_*.pt>  # distil onto deployable observations
-just rl-student-ppo                   # student trained directly with PPO
+just rl-student-ppo                   # working solution: bank-guided PPO, no teacher checkpoint
 just rl-eval <model_*.pt>             # success rate / stage metrics
 just rl-play <model_*.pt>             # Newton viewer + TorchScript/ONNX export
 
-RL_TOOL=SmallValve just rl-teacher    # BallValve (default), SmallValve, M30Thread, CircuitBreaker
+# Select the same task for bank generation, training and evaluation:
+RL_TOOL=SmallValve just rl-bank       # BallValve (default), SmallValve, M30Thread, CircuitBreaker
+RL_TOOL=SmallValve just rl-student-ppo
+```
 
+The following alternative workflows remain in the repository. Teacher checkpoints are required only for
+student distillation; these commands are not steps in the working PPO-student workflow above.
+
+```bash
+just rl-teacher                       # PPO teacher on privileged state
+just rl-student <teacher-model.pt>    # distil teacher actions onto deployable observations
 just il-collect                       # scripted-expert demos (robomimic layout)
 just il-train <dataset.hdf5>          # behaviour cloning
 just il-dagger <dataset.hdf5>         # DAgger rounds
