@@ -45,6 +45,28 @@ RL_TOOL=SmallValve just rl-bank       # BallValve (default), SmallValve, M30Thre
 RL_TOOL=SmallValve just rl-student-ppo
 ```
 
+BallValve limits each integrated arm target to 0.1 rad from the measured joint position at command updates.
+This limits stored drive error under contact before release; the other tasks retain their original controller.
+Some error is necessary to generate turning torque, so changes to this bound should be evaluated for both
+opening success and release motion. Use `env.actions.arm_action.max_position_error=null` to reproduce the
+original controller.
+
+Expert joint-velocity tracking is available as an opt-in reward:
+`env.rewards.track_expert_velocity.weight=1.0` (per-joint RMS error scale 0.5 rad/s).
+It follows the same idle-free reference timeline as position tracking and asks for zero velocity after the
+recorded retreat. A matched pilot comparison resumes one checkpoint twice, with the same seed and target
+limit, then attaches 100-episode evaluation metrics and a standard-condition trajectory to each W&B run:
+
+```bash
+uv run python scripts/rl/compare_release.py --checkpoint <model_999.pt> --iterations 50 --episodes 100
+uv run python scripts/rl/trace_policy.py --checkpoint <model_*.pt> --output logs/diagnostics/release
+```
+
+Comparison runs use the W&B group `ballvalve_release_cap_vs_velocity` and names containing the target limit,
+velocity-reward variant, source iteration, pilot length and seed. Results are written under
+`logs/release_comparison/`. These short, single-seed pilots do not establish convergence. Evaluation reports
+release speed, acceleration and expert-velocity error separately from the earlier metrics that stop at opening.
+
 Publication recording uses the core recorder's publication settings: RTX quality 100, studio lighting,
 50 FPS output, and H.264 CRF 12 with the slow preset. Frames are captured at the RL policy's step rate
 and repeated for 50 FPS output, preserving simulation timing. Pass `--video_length` to change the
