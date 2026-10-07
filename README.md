@@ -67,6 +67,12 @@ velocity-reward variant, source iteration, pilot length and seed. Results are wr
 `logs/release_comparison/`. These short, single-seed pilots do not establish convergence. Evaluation reports
 release speed, acceleration and expert-velocity error separately from the earlier metrics that stop at opening.
 
+Training retains every checkpoint locally but uploads only the best and latest saved weights to W&B when
+training ends. "Best" means the highest rolling mean training episode return among saved checkpoints;
+it does not mean the best independently evaluated success rate. The selected filenames, iterations and score
+are recorded in the W&B `Checkpoints/*` summary fields. Interrupted runs upload the selected weights already
+saved locally. Original `model_<iteration>.pt` filenames preserve the W&B checkpoint-loading workflow.
+
 Publication recording uses the core recorder's publication settings: RTX quality 100, studio lighting,
 50 FPS output, and H.264 CRF 12 with the slow preset. Frames are captured at the RL policy's step rate
 and repeated for 50 FPS output, preserving simulation timing. Pass `--video_length` to change the
