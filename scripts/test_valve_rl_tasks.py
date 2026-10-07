@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import math
+from types import SimpleNamespace
 
 import gymnasium as gym
 import isaaclab_hiveboard_rl  # noqa: F401
@@ -58,6 +59,41 @@ def test_ball_valve_dynamics_unchanged():
     assert params["ranges"] == valve_dynamics.VALVE_DYNAMICS_RANGES
     scale = valve_dynamics.dynamics_scale(params["ranges"], params["stuck_breakaway"])
     assert scale == (2.0, 0.5, 1.0, 5.0, 0.02)
+
+
+def test_integrated_target_cannot_wind_up_against_blocked_joint():
+    from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl.mdp import IntegratedJointPositionAction
+
+    action = object.__new__(IntegratedJointPositionAction)
+    measured = torch.tensor([[0.0, 0.95]])
+    action.cfg = SimpleNamespace(smoothing=1.0, max_position_error=0.1)
+    action._joint_ids = [0, 1]
+    action._target = measured.clone()
+    action._filtered = torch.zeros_like(measured)
+    action._processed_actions = torch.full_like(measured, 0.1)
+    action._lower = torch.full_like(measured, -1.0)
+    action._upper = torch.full_like(measured, 1.0)
+    writes = []
+    action._asset = SimpleNamespace(data=SimpleNamespace(joint_pos=SimpleNamespace(torch=measured)),
+        set_joint_position_target_index=lambda **kwargs: writes.append(kwargs['target'].clone()))
+    for _ in range(100):
+        action._fresh = True
+        action.apply_actions()
+        action.apply_actions()  # Physics substeps must not integrate twice.
+    assert torch.allclose(action._target, torch.tensor([[0.1, 1.0]]))
+    assert torch.equal(writes[-1], writes[-2])
+    # Reverse direction immediately: there must be no hidden accumulated target.
+    action._processed_actions.fill_(-0.1)
+    action._fresh = True
+    action.apply_actions()
+    assert torch.allclose(action._target, torch.tensor([[0.0, 0.9]]))
+
+
+def test_error_limit_is_enabled_only_for_ball_valve():
+    for task in _TASKS:
+        _, cfg = _cfg(task)
+        assert cfg.actions.arm_action.max_position_error == (0.1 if 'BallValve' in task else None)
+
 
 
 @pytest.mark.parametrize("closed, opening_sign", [(0.0, -1.0), (0.0, 1.0), (0.3, -1.0)])

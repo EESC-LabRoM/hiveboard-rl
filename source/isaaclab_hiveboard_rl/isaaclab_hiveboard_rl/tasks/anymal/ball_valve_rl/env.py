@@ -450,6 +450,9 @@ class AnymalBallValveRLEnvCfg(ManagerBasedRLEnvCfg):
     sim: SimulationCfg = SimulationCfg(dt=1 / 200, render_interval=10, physics=BallValveRLPhysicsCfg())  # type: ignore
 
     def __post_init__(self):
+        if self.valve_task.asset_name == "ball_valve":
+            # Prevent stored drive error from snapping the arm when it lets go.
+            self.actions.arm_action.max_position_error = 0.1
         # 20 Hz policy. The slowest commanded turn (0.25 rad/s) takes 6.3 s; the
         # expert's slowest reaches (a far start posture, a wrist flip, a slow
         # reach speed) take ~5 s, and 99% of its trajectories open by 12.5 s.

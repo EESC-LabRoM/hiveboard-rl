@@ -21,6 +21,7 @@ Two observation tiers are built from these terms:
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -193,6 +194,9 @@ class IntegratedJointPositionAction(JointAction):
         limits = self._asset.data.soft_joint_pos_limits.torch[:, self._joint_ids]
         self._lower = limits[..., 0].clone()
         self._upper = limits[..., 1].clone()
+        limit = cfg.max_position_error
+        if limit is not None and (not math.isfinite(limit) or limit <= 0):
+            raise ValueError("max_position_error must be finite and positive, or None")
 
     def apply_actions(self):
         # Newton runs the decimation loop itself, so this is called once per
@@ -202,6 +206,12 @@ class IntegratedJointPositionAction(JointAction):
             alpha = self.cfg.smoothing
             self._filtered.mul_(1.0 - alpha).add_(self.processed_actions, alpha=alpha)
             self._target += self._filtered
+            # Store the bounded target itself: clipping only the drive's output
+            # would leave a hidden integrator winding up against contact.
+            if self.cfg.max_position_error is not None:
+                measured = self._asset.data.joint_pos.torch[:, self._joint_ids]
+                limit = self.cfg.max_position_error
+                torch.clamp(self._target, measured - limit, measured + limit, out=self._target)
             torch.clamp(self._target, self._lower, self._upper, out=self._target)
             self._fresh = False
         self._asset.set_joint_position_target_index(target=self._target, joint_ids=self._joint_ids)
@@ -230,6 +240,12 @@ class IntegratedJointPositionActionCfg(JointActionCfg):
     class_type: type = IntegratedJointPositionAction
     smoothing: float = 1.0
     """Weight of the new action in the low-pass filter; 1.0 disables filtering."""
+    max_position_error: float | None = None
+    """Maximum integrated target error per joint [rad]; None keeps unbounded integration.
+
+    Some error is needed to generate drive torque under load. The limit must
+    be chosen against the task's required torque and validated in simulation.
+    """
 
 
 def silence_solver_overflow_warnings(env: ManagerBasedEnv, env_ids: torch.Tensor | None) -> None:
