@@ -394,6 +394,8 @@ class RewardsCfg:
     # the arm is far from it; the fine one asks for precision.
     track_expert_coarse = RewTerm(func=expert_bank.track_expert_joints, weight=2.0, params={"std": 0.5})
     track_expert = RewTerm(func=expert_bank.track_expert_joints, weight=3.0, params={"std": 0.15})
+    # Opt-in ablation: enable with env.rewards.track_expert_velocity.weight=1.0.
+    track_expert_velocity = RewTerm(func=expert_bank.track_expert_velocity, weight=0.0, params={"std": 0.5})
     # Close the gripper when the expert does (teacher v10, rewarded on joints
     # only, reached the lever every time but never closed it in 600 iterations;
     # at weight 1.0, v13/v14 unlearned closing by iteration 300). Tracks the

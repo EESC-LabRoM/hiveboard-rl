@@ -192,6 +192,26 @@ class ExpertBank:
         """Expert measured joints at episode ``step``, ``(len(idx), 6)``."""
         return self.q[idx, self._bank_step(idx, step)]
 
+    def joint_reference(self, idx: torch.Tensor, step: torch.Tensor) -> torch.Tensor:
+        """Joint reference on the same idle-free reach and recorded turn timeline."""
+        reach = self.reach_reference(idx, step)
+        turn = self.turn_reference(idx, step)
+        return torch.where((step >= self.grasp_step[idx])[:, None], turn, reach)
+
+    def velocity_reference(self, idx: torch.Tensor, step: torch.Tensor) -> torch.Tensor:
+        """Central-difference reference velocity [rad/s], zero after the recording.
+
+        Differentiate the actual position-reward timeline, including removed
+        reach idle steps. At episode step zero use a forward difference.
+        """
+        previous = (step - 1).clamp(min=0)
+        following = step + 1
+        velocity = (self.joint_reference(idx, following) - self.joint_reference(idx, previous)) / (
+            (following - previous).float()[:, None] * self.dt
+        )
+        held = (step >= self.grasp_step[idx]) & (self._bank_step(idx, step) >= self.q.shape[1] - 1)
+        return torch.where(held[:, None], torch.zeros_like(velocity), velocity)
+
 
 class reset_from_expert_bank(ManagerTermBase):
     """Reset event: start each episode on a random bank trajectory.
@@ -249,8 +269,8 @@ class reset_from_expert_bank(ManagerTermBase):
             # Recording is evaluated from home, rather than a sampled expert start.
             self.index[ids] = 0
             self.start_step[ids] = 0
-            from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl.env import ARM_POSTURES
             from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl import mdp
+            from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl.env import ARM_POSTURES
 
             robot = env.scene["robot"]
             home = torch.tensor(ARM_POSTURES["home"], device=env.device).expand(len(ids), -1)
@@ -335,9 +355,7 @@ def expert_joint_reference(env: ManagerBasedRLEnv, command_name: str = "valve_tu
     """
     term = _bank_term(env)
     idx, step = term.index, reference_step(env)
-    reach = term.bank.reach_reference(idx, step)
-    turn = term.bank.turn_reference(idx, step)
-    return torch.where((step >= term.bank.grasp_step[idx])[:, None], turn, reach)
+    return term.bank.joint_reference(idx, step)
 
 
 def expert_joint_error(env: ManagerBasedRLEnv, command_name: str = "valve_turn") -> torch.Tensor:
@@ -351,6 +369,18 @@ def track_expert_joints(env: ManagerBasedRLEnv, std: float, command_name: str = 
     """``exp(-||q - q_expert||^2 / std^2)`` over the six arm joints; ``std`` [rad]."""
     error = expert_joint_error(env, command_name)
     return torch.exp(-error.square().sum(dim=-1) / std**2)
+
+
+def track_expert_velocity(env: ManagerBasedRLEnv, std: float) -> torch.Tensor:
+    """Match measured arm velocity to the expert, using mean squared error.
+
+    ``std`` [rad/s] sets the per-joint RMS error scale. This rewards stopping
+    after retreat as well as matching the reach, turn and release speeds.
+    """
+    term = _bank_term(env)
+    reference = term.bank.velocity_reference(term.index, reference_step(env))
+    measured = env.scene["robot"].data.joint_vel.torch[:, term._arm_ids]
+    return torch.exp(-(measured - reference).square().mean(dim=-1) / std**2)
 
 
 def expert_valve_error(env: ManagerBasedRLEnv) -> torch.Tensor:

@@ -95,6 +95,21 @@ def test_error_limit_is_enabled_only_for_ball_valve():
         assert cfg.actions.arm_action.max_position_error == (0.1 if 'BallValve' in task else None)
 
 
+def test_expert_velocity_uses_idle_shift_and_stops_at_end():
+    from isaaclab_hiveboard_rl.tasks.anymal.ball_valve_rl.expert_bank import ExpertBank
+
+    bank = object.__new__(ExpertBank)
+    bank.dt = 0.05
+    bank.grasp_step = torch.tensor([2])
+    bank.idle_shift = torch.tensor([2])
+    bank.reach = torch.tensor([[[0.0], [0.05], [0.1]]])
+    # Two idle samples removed from the recorded reach; turn begins at bank step 4.
+    bank.q = torch.tensor([[[0.0], [0.0], [0.0], [0.05], [0.1], [0.15], [0.2]]])
+    for step in (0, 1, 2, 3):
+        assert bank.velocity_reference(torch.tensor([0]), torch.tensor([step])).item() == pytest.approx(1.0)
+    for step in (4, 5, 100):
+        assert bank.velocity_reference(torch.tensor([0]), torch.tensor([step])).item() == 0.0
+
 
 @pytest.mark.parametrize("closed, opening_sign", [(0.0, -1.0), (0.0, 1.0), (0.3, -1.0)])
 def test_closing_torque_turns_toward_closed(closed, opening_sign):
