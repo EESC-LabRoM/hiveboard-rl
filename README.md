@@ -45,11 +45,14 @@ RL_TOOL=SmallValve just rl-bank       # BallValve (default), SmallValve, M30Thre
 RL_TOOL=SmallValve just rl-student-ppo
 ```
 
-BallValve limits each integrated arm target to 0.1 rad from the measured joint position at command updates.
-This limits stored drive error under contact before release; the other tasks retain their original controller.
-Some error is necessary to generate turning torque, so changes to this bound should be evaluated for both
-opening success and release motion. Use `env.actions.arm_action.max_position_error=null` to reproduce the
-original controller.
+BallValve used to limit each integrated arm target to 0.1 rad from the measured joint position at command updates,
+to limit stored drive error under contact before release. The bound is off for now: at 0.1 rad only 59% of
+expert-bank trajectories still open the valve through the increment action, against 98% without it, which caps
+the behaviour-cloning baselines below. It will return with a larger value once the expert bank moves smoothly
+enough to stay inside it (TODO). Some error is necessary to generate turning torque, so a new bound should be
+evaluated for both opening success and release motion. Use `env.actions.arm_action.max_position_error=0.1` to
+reproduce the bounded controller (`scripts/rl/compare_release.py` does). PPO-student checkpoints trained before
+this change were trained with the bound; pass that override when evaluating or resuming them.
 
 Expert joint-velocity tracking is available as an opt-in reward:
 `env.rewards.track_expert_velocity.weight=1.0` (per-joint RMS error scale 0.5 rad/s).
@@ -114,6 +117,42 @@ just il-dagger <dataset.hdf5>         # DAgger rounds
 just il-eval --checkpoint <ckpt>
 ```
 
+### Behaviour-cloning baselines
+
+Behaviour cloning from the same expert bank, compared against the PPO student. Each baseline trains the PPO
+student's actor network on its `policy` observations, and is evaluated with the same metrics:
+
+| Baseline | Arm command (`env.actions.arm_action.command`) | Purpose |
+|---|---|---|
+| BC-A | `increment`: the PPO student's action space | Controlled comparison: only the learning signal differs |
+| BC-B | `absolute`: the scripted expert's joint-position control | Debugging: the expert's own interface, without the integrator or its speed limit |
+| BC-C | `absolute_integrated`: absolute targets through the PPO student's integrator | Tells whether BC-A fails because of imitation or because of the incremental action parameterization |
+| BC-B / BC-C, relative | `relative` / `relative_integrated`: the same targets, given relative to the measured joints | As above, without the absolute targets' copy-the-joints shortcut (see below) |
+| BC-A + PPO | `increment`, fine-tuned by the PPO student's training | Demonstrations as initialization |
+| PPO student | `increment` | The current working solution (reference) |
+
+```bash
+just bc-collect increment              # record the bank in the RL task -> logs/imitation/bank_demos/
+just bc-collect absolute               # one dataset per command (BC-B)
+just bc-collect absolute_integrated    # (BC-C)
+just bc-collect relative               # BC-B / BC-C with relative targets
+just bc-train logs/imitation/bank_demos/anymal_ball_valve_increment.pt   # -> logs/rsl_rl/<student>_bc/<run>/model_0.pt
+just bc-eval <bc model_0.pt>           # rl-eval with the checkpoint's arm command
+just bc-ppo <BC-A model_0.pt>          # BC-A + PPO (100 critic-only warm-up iterations, then lr 1e-5)
+```
+
+`bc-collect` plays the bank expert in the RL training task, in the chosen arm command, one trajectory per episode,
+with the expert terminations off. It stores successful episodes only, unless you pass `--keep_failed`. The
+replay success it prints is the ceiling for BC on that dataset. `bc-train` fits the actor offline and writes an
+ordinary RSL-RL checkpoint. Its `bc.json` records the overrides that a non-increment command needs, and `bc-eval`
+applies them. Use `--action_history_noise 0.5` (or `--ignore_action_history`): without it, every plain fit opens
+0% (the copycat problem). `bc-ppo` adds a 100-iteration critic-only warm-up, an actor learning rate of 1e-5 and a frozen
+actor normalizer (`agents/critic_warmup.py`). The contact gate on the valve reward is opt-in:
+`env.rewards.track_expert_valve.params.gate_on_contact=true env.rewards.track_expert_valve_coarse.params.gate_on_contact=true`.
+
+BallValve results: BC-A 96%, PPO student 88% (999 iterations), BC-A + PPO 41%. Fine-tuning from BC does not work
+yet. See [research/bc_baselines.md](research/bc_baselines.md) for all results, findings and runs.
+
 ## Updating the core
 
 ```bash
@@ -134,6 +173,6 @@ source/isaaclab_hiveboard_rl/isaaclab_hiveboard_rl/
   tasks/anymal/        # ball_valve_rl, small_valve_rl, m30_thread_rl, circuit_breaker_rl
   imitation/           # scripted expert, datasets, robomimic policy, rollouts
 scripts/rl/            # train, evaluate, play, expert-bank tools
-scripts/imitation/     # collect_demos, train_bc, dagger, eval_policy
+scripts/imitation/     # collect_bank_demos, train_bank_bc (BC baselines); collect_demos, train_bc, dagger, eval_policy (robomimic)
 logs/                  # expert banks, rsl_rl runs, imitation datasets (gitignored)
 ```
