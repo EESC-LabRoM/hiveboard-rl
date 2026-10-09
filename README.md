@@ -1,6 +1,6 @@
 # HiveBoard RL
 
-Reinforcement and imitation learning on the [isaaclab-hiveboard](https://github.com/EESC-LabRoM/isaaclab-hiveboard)
+Reinforcement and imitation learning on the [isaaclab-hiveboard](https://github.com/hiveboard-bench/isaaclab-hiveboard)
 environments (ANYmal ball valve, small valve, M30 thread, circuit breaker).
 **The current working solution is the PPO student trained with a cuRobo expert trajectory bank.**
 Teacher training, student distillation, robomimic behaviour cloning and DAgger remain available as alternative
@@ -13,7 +13,7 @@ ones, and the training scripts.
 ## Installation
 
 ```bash
-git clone https://github.com/EESC-LabRoM/hiveboard-rl.git && cd hiveboard-rl
+git clone https://github.com/hiveboard-bench/hiveboard-rl.git && cd hiveboard-rl
 just setup           # core submodule + the nested ones it needs, then uv sync --extra imitation
 just sync-assets     # copy generated USD assets from ../isaaclab-hiveboard (or pass core=<path>)
 just list-envs
